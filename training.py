@@ -201,18 +201,4 @@ class LinearDecaySchedule():
     def __call__(self, iter):
         return self.start_val + (self.final_val - self.start_val) * min(iter / self.num_steps, 1.)
 
-# Usage example (you need to define your models, loss function, and data loaders):
-# cheby_model = ChebyModel()
-# mlp_model = MLPModel()
-# models = {'cheby': cheby_model, 'mlp': mlp_model}
 
-# train_dataloader = ...  # your data loader
-# val_dataloader = ...  # your validation data loader
-# epochs_dict = {'cheby': 500, 'mlp': 300}
-# lr = 0.001
-# steps_til_summary = 100
-# epochs_til_checkpoint = 100
-# model_dir = './model_checkpoints'
-# loss_fn = ...  # your loss function
-
-# train(models, train_dataloader, epochs_dict, lr, steps_til_summary, epochs_til_checkpoint, model_dir, loss_fn, val_dataloader=val_dataloader)
