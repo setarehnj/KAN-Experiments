@@ -183,67 +183,11 @@ def val_fn(models, ckpt_dir, epoch):
 
 
 
-# def val_fn(model, ckpt_dir, epoch):
-#     # Time values at which the function needs to be plotted
-#     times = [0., 0.5*(opt.tMax - 0.1), (opt.tMax - 0.1)]
-#     num_times = len(times)
-
-#     # Theta slices to be plotted
-#     thetas = [-math.pi, -0.5*math.pi, 0., 0.5*math.pi, math.pi]
-#     num_thetas = len(thetas)
-
-#     # Create a figure
-#     fig = plt.figure(figsize=(5*num_times, 5*num_thetas))
-
-#     # Get the meshgrid in the (x, y) coordinate
-#     sidelen = 200
-#     mgrid_coords = dataio.get_mgrid(sidelen)
-
-#     # Start plotting the results
-#     for i in range(num_times):
-#         time_coords = torch.ones(mgrid_coords.shape[0], 1) * times[i]
-
-#         for j in range(num_thetas):
-#             theta_coords = torch.ones(mgrid_coords.shape[0], 1) * thetas[j]
-#             theta_coords = theta_coords / (opt.angle_alpha * math.pi)
-#             coords = torch.cat((time_coords, mgrid_coords, theta_coords), dim=1)
-#             model_in = {'coords': coords.cuda()}
-#             model_out = model(model_in)['model_out']
-
-#             # Detach model output and reshape
-#             model_out = model_out.detach().cpu().numpy()
-#             model_out = model_out.reshape((sidelen, sidelen))
-
-#             # Unnormalize the value function
-#             norm_to = 0.02
-#             mean = 0.25
-#             var = 0.5
-#             model_out = (model_out * var / norm_to) + mean
-
-#             # Plot the zero level sets
-#             model_out = (model_out <= 0.001) * 1.
-
-#             # Plot the actual data
-#             ax = fig.add_subplot(num_times, num_thetas, (j + 1) + i * num_thetas)
-#             ax.set_title('t = %0.2f, theta = %0.2f' % (times[i], thetas[j]))
-#             s = ax.imshow(model_out.T, cmap='bwr', origin='lower', extent=(-1., 1., -1., 1.))
-#             fig.colorbar(s)
-
-#     fig.savefig(os.path.join(ckpt_dir, 'BRS_validation_plot_epoch_%04d.png' % epoch))
-
-
-
 # Create a dictionary of epochs for each model
 epochs_dict = {'kan': opt.kan_num_epochs, 'mlp': opt.dnn_num_epochs}  # line added: dictionary of epochs for each model
 
 # Create a dictionary of pretrain iterations for each model
 #pretrain_iterations_dict = {'cheby': opt.pretrain_iters, 'mlp': opt.pretrain_iters}  # line added: dictionary of pretrain iterations for each model
-
-# Train the models
-# training.train(models=models, train_dataloader=dataloader, epochs_dict=epochs_dict, lr=opt.lr,
-#                steps_til_summary=opt.steps_til_summary, epochs_til_checkpoint=opt.epochs_til_ckpt,
-#                model_dir=root_path, loss_fn=loss_fn, clip_grad=opt.clip_grad,
-#                use_lbfgs=opt.use_lbfgs, validation_fn= val_fn, start_epoch=opt.checkpoint_toload)
 
 
 # Train the models
@@ -251,6 +195,3 @@ cheby_losses, mlp_losses = training.train(models=models, train_dataloader=datalo
                                           steps_til_summary=opt.steps_til_summary, epochs_til_checkpoint=opt.epochs_til_ckpt,
                                           model_dir=root_path, loss_fn=loss_fn, clip_grad=opt.clip_grad,
                                           use_lbfgs=opt.use_lbfgs, validation_fn=val_fn)
-
-# Plot convergence curves
-#plot_convergence_curves(cheby_losses, mlp_losses, root_path)
