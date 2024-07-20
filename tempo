@@ -1,0 +1,71 @@
+class FourierKANLayer(nn.Module):
+    def __init__(self, input_dim, output_dim, initial_gridsize=10, learnable_frequencies=False):
+        super(FourierKANLayer, self).__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.initial_gridsize = initial_gridsize
+        self.learnable_frequencies = learnable_frequencies
+        
+        # Learnable gridsize parameter
+        self.gridsize_param = nn.Parameter(torch.tensor(initial_gridsize, dtype=torch.float32))
+        
+        # Learnable frequency factors (if enabled)
+        if learnable_frequencies:
+            self.frequency_factors = nn.Parameter(torch.randn(input_dim, initial_gridsize))
+        else:
+            self.register_buffer('frequency_factors', torch.arange(1, initial_gridsize + 1).unsqueeze(0).expand(input_dim, -1).float())
+        
+        # Learnable Fourier coefficients
+        self.fouriercoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, initial_gridsize))
+        nn.init.normal_(self.fouriercoeffs, mean=0.0, std=1 / (input_dim * initial_gridsize * 2))
+
+    def forward(self, x):
+        gridsize = torch.clamp(self.gridsize_param, min=1).round().int()
+        
+        x = x.view(-1, self.input_dim, 1)
+        
+        frequencies = self.frequency_factors[:, :gridsize] / self.gridsize_param
+        
+        angles = 2 * math.pi * frequencies.unsqueeze(0) * x
+        
+        fourier_terms = torch.stack([torch.cos(angles), torch.sin(angles)], dim=-2)
+        
+        output = torch.einsum('bifd,iofd->bo', fourier_terms, self.fouriercoeffs[..., :gridsize])
+        output = output.view(1, -1, 1)
+        
+        return output
+
+
+
+
+class ChebyKANLayer(nn.Module):
+    def __init__(self, input_dim, output_dim, degree):
+        super(ChebyKANLayer, self).__init__()
+        self.inputdim = input_dim
+        self.outdim = output_dim
+        self.degree = degree
+
+        self.cheby_coeffs = nn.Parameter(torch.empty(input_dim, output_dim, degree + 1))
+        nn.init.normal_(self.cheby_coeffs, mean=0.0, std=1 / (input_dim * (degree + 1)))
+        self.register_buffer("arange", torch.arange(0, degree + 1, 1))
+
+    def forward(self, x):
+        # Since Chebyshev polynomial is defined in [-1, 1]
+        # We need to normalize x to [-1, 1] using tanh
+        x = torch.tanh(x)
+        # View and repeat input degree + 1 times
+        x = x.view((-1, self.inputdim, 1)).expand(
+            -1, -1, self.degree + 1
+        )  # shape = (batch_size, inputdim, self.degree + 1)
+        # Apply acos
+        x = x.acos()
+        # Multiply by arange [0 .. degree]
+        x *= self.arange
+        # Apply cos
+        x = x.cos()
+        # Compute the Chebyshev interpolation
+        y = torch.einsum(
+            "bid,iod->bo", x, self.cheby_coeffs
+        )  # shape = (batch_size, outdim)
+        y = y.view(-1, self.outdim)
+        return y

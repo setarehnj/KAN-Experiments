@@ -15,6 +15,7 @@ import math
 from torch.utils.data import DataLoader
 import configargparse
 import scipy.io as spio
+from sklearn.metrics import mean_squared_error
 
 logging_root = './logs'
 angle_alpha = 1.2
@@ -46,6 +47,9 @@ true_data = spio.loadmat(true_BRT_path)
 val_functions = {}
 val_functions['LS'] = []
 val_functions['siren'] = []
+
+mse_brs_list = []
+mse_valfunc_list = []
 
 # Define the validation function
 def val_fn_BRS(model):
@@ -90,6 +94,13 @@ def val_fn_BRS(model):
       # Fetch the BRS
       brs_predicted = (valfunc <= 0.001) * 1.
       brs_actual = (valfunc_true <= 0.001) * 1.
+
+      mse_brs = mean_squared_error(brs_actual, brs_predicted)
+      mse_brs_list.append(mse_brs)
+
+      mse_valfunc = mean_squared_error(valfunc_true, valfunc)
+      mse_valfunc_list.append(mse_valfunc)
+
       # Plot it
       ax = fig_brs.add_subplot(num_times, num_thetas, (j+1) + i*num_thetas)
       ax.set_title('t = %0.2f, theta = %0.2f' % (times[i], thetas[j]))
@@ -112,12 +123,18 @@ def val_fn_BRS(model):
       val_functions['LS'].append(valfunc_true)
       val_functions['siren'].append(valfunc)
 
-  return fig_brs, fig_valfunc_LS, fig_valfunc_siren, val_functions
+  avg_mse_brs = np.mean(mse_brs_list)
+  avg_mse_valfunc = np.mean(mse_valfunc_list)
+  return fig_brs, fig_valfunc_LS, fig_valfunc_siren, val_functions, avg_mse_brs, avg_mse_valfunc
 
 # Run the validation of sets
-fig_brs, fig_valfunc_LS, fig_valfunc_siren, val_functions = val_fn_BRS(model)
+fig_brs, fig_valfunc_LS, fig_valfunc_siren, val_functions, avg_mse_brs, avg_mse_valfunc = val_fn_BRS(model)
+
+print(f"Average MSE for BRT (w.r.t. analytical solution): {avg_mse_brt:.9f}")
+print(f"Average MSE for Value Function (w.r.t. LST solution): {avg_mse_valfunc:.9f}")
 
 fig_brs.savefig(os.path.join(logging_root, 'Air3D_BRS_comparison.png'))
 fig_valfunc_LS.savefig(os.path.join(logging_root, 'Air3D_LS_valfunc.png'))
 fig_valfunc_siren.savefig(os.path.join(logging_root, 'Air3D_Siren_valfunc.png'))
 spio.savemat(os.path.join(logging_root, 'Air3D_raw_valfuncs.mat'), val_functions)
+
