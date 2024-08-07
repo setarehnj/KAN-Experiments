@@ -143,7 +143,4 @@ today_26_logs/
 *.txt
 *.csv
 *.log
-*.json
-*.xml
-*.yaml
 *.tx
