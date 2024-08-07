@@ -127,14 +127,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-today_logs/
-tbsj_logs/
-tb_logs/
-tbs_logs/
+fri_logs/
+friday_logs/
+friday_logs_2/
+lightening_logs/
 logs/
 resources/
-resources/
-logs/
 tbs_logs/
 tb_logs/
 tbsj_logs/
