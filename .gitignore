@@ -139,3 +139,11 @@ tbs_logs/
 tb_logs/
 tbsj_logs/
 today_logs/
+today_26_logs/ 
+*.txt
+*.csv
+*.log
+*.json
+*.xml
+*.yaml
+*.tx
