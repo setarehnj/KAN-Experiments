@@ -1,4 +1,4 @@
-import matplotlib
+import matplotlib 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
@@ -23,16 +23,19 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 def ensure_dir(path):
     os.makedirs(path, exist_ok= True)
 
-def plot_metric(lightning_modules, metric_name, root_path, log_scale=False, interval=1):
+
+def plot_metric(lightning_modules, metric_name, root_path, log_scale=False):
     plot_dir = os.path.join(root_path, 'plots', metric_name.replace('_', ' ').title())
     ensure_dir(plot_dir)
     
     plt.figure(figsize=(10, 6))
     for lightning_module in lightning_modules:
-        data = getattr(lightning_module, metric_name)
-        epochs = range(0, len(data), interval)
-        values = data[::interval]
-        plt.plot(epochs, values, label=lightning_module.model_name)
+      print(f'Metric name is: {metric_name}')
+      # print(f'Metric shape is: {getattr(lightning_module, metric_name).shape}')
+      data = getattr(lightning_module, metric_name)
+      epochs = range(0, len(data), 1)
+      values = data[::1]
+      plt.plot(epochs, values, label=lightning_module.model_name)
     
     if log_scale:
         plt.yscale('log')
@@ -40,31 +43,72 @@ def plot_metric(lightning_modules, metric_name, root_path, log_scale=False, inte
     plt.ylabel(metric_name.replace('_', ' ').title())
     plt.legend()
     plt.title(f'{metric_name.replace("_", " ").title()} vs Epochs')
-    if interval == 1:
-        filename = f'{metric_name}_plot.png'
-    else:
-        filename = f'{metric_name}_plot_interval_{interval}.png'
+    filename = f'{metric_name}_plot.png'
     plt.savefig(os.path.join(plot_dir, filename))
     plt.close()
 
+def plot_metric_intervals(lightning_modules, metric_name, root_path, log_scale=False, interval=100):
+    plot_dir = os.path.join(root_path, 'plots', metric_name.replace('_', ' ').title(), 'intervals')
+    ensure_dir(plot_dir)
+    
+    for start_epoch in range(0, max([len(getattr(lm, metric_name)) for lm in lightning_modules]), interval):
+        plt.figure(figsize=(10, 6))
+        for lightning_module in lightning_modules:
+            data = getattr(lightning_module, metric_name)
+            end_epoch = min(start_epoch + interval, len(data))
+            epochs = range(start_epoch, end_epoch)
+            values = data[start_epoch:end_epoch]
+            plt.plot(epochs, values, label=lightning_module.model_name)
+        
+        if log_scale:
+            plt.yscale('log')
+        plt.xlabel('Epochs')
+        plt.ylabel(metric_name.replace('_', ' ').title())
+        plt.legend()
+        plt.title(f'{metric_name.replace("_", " ").title()} vs Epochs [{start_epoch}, {end_epoch - 1}]')
+        filename = f'{metric_name}_plot_epochs_{start_epoch}_{end_epoch - 1}.png'
+        plt.savefig(os.path.join(plot_dir, filename))
+        plt.close()
+
 def plot_all_metrics(lightning_modules, root_path):
     metrics = [
-        ('train_losses', True),
+        ('avg_losses', True),
         ('iteration_times', False),
-        ('total_training_times', False),
-        ('total_training_losses', True)
+        ('total_training_times', False), 
+        ('train_losses', True)
     ]
-    
     for metric, log_scale in metrics:
         plot_metric(lightning_modules, metric, root_path, log_scale)
-        plot_metric(lightning_modules, metric, root_path, log_scale, interval=100)
-        if metric == 'train_losses':
-            plot_metric(lightning_modules, metric, root_path, log_scale, interval=1000)
+        plot_metric_intervals(lightning_modules, metric, root_path, log_scale, interval=5)
+        # if metric == 'train_losses':
+        #   plot_metric_intervals(lightning_modules, metric, root_path, log_scale, interval=1000)
+
     
     
 
 # Usage (after training is complete):
+def gpu_warmup(device, input_size, hidden_size, output_size, num_iterations=10):
+    # Create a dummy input tensor
+    dummy_input = torch.randn(64, input_size, device=device)
 
+    # Create a simple model with linear layers
+    model = torch.nn.Sequential(
+        torch.nn.Linear(input_size, hidden_size),
+        torch.nn.ReLU(),
+        torch.nn.Linear(hidden_size, hidden_size),
+        torch.nn.ReLU(),
+        torch.nn.Linear(hidden_size, output_size)
+    ).to(device)
+
+    # Perform multiple forward passes to warm up the GPU
+    for _ in range(num_iterations):
+        with torch.no_grad():
+            _ = model(dummy_input)
+
+    # Clear the GPU cache
+    torch.cuda.empty_cache()
+
+    print("GPU warm-up completed")
 
 
 ###===========================================================================================================================
@@ -187,98 +231,26 @@ dnn_lightning = ModelLightningModule(dnn_model, loss_fn, opt.lr, opt.steps_til_s
 fourier_lightning = ModelLightningModule(fourier_model, loss_fn, opt.lr, opt.steps_til_summary, model_name='fourier')
 wavelet_lightning = ModelLightningModule(wavelet_model, loss_fn, opt.lr, opt.steps_til_summary, model_name='wavelet')
 
+if torch.cuda.is_available():
+  gpu_warmup(torch.device('cuda:0'), input_size=1000, hidden_size=2000, output_size=500)
+  gpu_warmup(torch.device('cuda:1'), input_size=1000, hidden_size=2000, output_size=500)
+
+
+
 
 # Define the trainers
-trainer_chebyshev = pl.Trainer(max_epochs=opt.chebyshev_num_epochs, accelerator='gpu', devices=[0], logger=chebyshev_logger, log_every_n_steps=1)
 trainer_dnn = pl.Trainer(max_epochs=opt.dnn_num_epochs, accelerator='gpu', devices=[0], logger= dnn_logger, log_every_n_steps=1)
+trainer_chebyshev = pl.Trainer(max_epochs=opt.chebyshev_num_epochs, accelerator='gpu', devices=[0], logger=chebyshev_logger, log_every_n_steps=1)
 trainer_fourier = pl.Trainer(max_epochs=opt.fourier_num_epochs, accelerator='gpu', devices=[1], logger=fourier_logger, log_every_n_steps=1)
 trainer_wavelet = pl.Trainer(max_epochs=opt.wavelet_num_epochs, accelerator='gpu', devices=[1], logger=wavelet_logger, log_every_n_steps=1)
 
 
-# # Define the trainers
-# trainer_chebyshev = pl.Trainer(max_epochs=opt.chebyshev_num_epochs, accelerator='gpu', devices=[0], default_root_dir='fri_logs', logger=logger, log_every_n_steps=1)
-# trainer_dnn = pl.Trainer(max_epochs=opt.dnn_num_epochs, accelerator='gpu', devices=[0], default_root_dir='fri_logs', logger=logger, log_every_n_steps=1)
-# trainer_fourier = pl.Trainer(max_epochs=opt.fourier_num_epochs, accelerator='gpu', devices=[1], default_root_dir='fri_logs', logger=logger, log_every_n_steps=1)
-# trainer_wavelet = pl.Trainer(max_epochs=opt.wavelet_num_epochs, accelerator='gpu', devices=[1], default_root_dir='fri_logs', logger=logger, log_every_n_steps=1)
 
 # Train the models
-trainer_chebyshev.fit(chebyshev_lightning, dataloader)
 trainer_dnn.fit(dnn_lightning, dataloader)
 trainer_fourier.fit(fourier_lightning, dataloader)
+trainer_chebyshev.fit(chebyshev_lightning, dataloader)
 trainer_wavelet.fit(wavelet_lightning, dataloader)
-
-# Plot convergence curves
-# plot_convergence_curves(chebyshev_lightning.losses, dnn_lightning.losses, fourier_lightning.losses, wavelet_lightning.losses, root_path)
-
-# # Plot iteration time vs. epochs
-# plt.figure(figsize=(10, 6))
-# for lightning_module, label in zip([chebyshev_lightning, dnn_lightning, fourier_lightning, wavelet_lightning], ['chebyshev', 'dnn', 'fourier', 'wavelet']):
-#     epochs = range(len(lightning_module.iteration_times))
-#     plt.plot(epochs, lightning_module.iteration_times, label=label)
-
-# plt.xlabel('Epochs')
-# plt.ylabel('Iteration Time (s)')
-# plt.legend()
-# plt.title('Iteration Time vs Epochs')
-# plt.show()
-
-# Save scalar data to CSV
-# data = {
-#     'chebyshev_iteration_time': chebyshev_lightning.iteration_times,
-#     'chebyshev_total_training_time': chebyshev_lightning.total_training_times,
-#     'chebyshev_losses': chebyshev_lightning.losses,
-#     'dnn_iteration_time': dnn_lightning.iteration_times,
-#     'dnn_total_training_time': dnn_lightning.total_training_times,
-#     'dnn_losses': dnn_lightning.losses,
-#     'fourier_iteration_time': fourier_lightning.iteration_times,
-#     'fourier_total_training_time': fourier_lightning.total_training_times,
-#     'fourier_losses': fourier_lightning.losses,
-#     'wavelet_iteration_time': wavelet_lightning.iteration_times,
-#     'wavelet_total_training_time': wavelet_lightning.total_training_times,
-#     'wavelet_losses': wavelet_lightning.losses
-# }
-
-# df = pd.DataFrame(data)
-# df.to_csv(os.path.join(root_path, 'training_metrics.csv'), index=False)
-
-
-
-# metric_names = ['train_loss_epoch', 'iteration_time', 'total_training_time', 'total_training_loss']
-
-# # Collect and plot data
-# data = collect_data_from_logger(log_dir, metric_names)
-
-# plot_metric(data['train_loss_epoch'], root_path, 'Training Loss', log_scale=True)
-# plot_metric(data['iteration_time'], root_path, 'Iteration Time')
-# plot_metric(data['total_training_time'], root_path, 'Total Training Time')
-# plot_metric(data['total_training_loss'], root_path, 'Total Training Loss', log_scale=True)
-
-# # Optional: Plot specific epochs (e.g., every 100th epoch)
-# def plot_specific_epochs(metric_dict, root_path, metric_name, epoch_interval=100, log_scale=False):
-#     plot_dir = os.path.join(root_path, f'{metric_name.replace(" ", "_")}_interval')
-#     ensure_dir(plot_dir)
-    
-#     plt.figure(figsize=(10, 6))
-#     for model_name, values in metric_dict.items():
-#         epochs = list(range(0, len(values), epoch_interval))
-#         selected_values = values[::epoch_interval]
-#         plt.plot(epochs, selected_values, label=model_name, marker='o')
-    
-#     if log_scale:
-#         plt.yscale('log')
-#     plt.xlabel('Epochs')
-#     plt.ylabel(metric_name)
-#     plt.title(f'{metric_name} (Every {epoch_interval} Epochs)')
-#     plt.legend()
-#     plt.savefig(os.path.join(plot_dir, f'{metric_name.replace(" ", "_")}_interval.png'))
-#     plt.close()
-
-# # Plot metrics at specific intervals
-# plot_specific_epochs(data['total_training_time'], root_path, 'Total Training Time', epoch_interval=100)
-# plot_specific_epochs(data['total_training_loss'], root_path, 'Total Training Loss', epoch_interval=100, log_scale=True)
-
-# # Plot all metrics
-
 
 lightning_modules = [chebyshev_lightning, dnn_lightning, fourier_lightning, wavelet_lightning]
 
