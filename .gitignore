@@ -144,3 +144,4 @@ today_26_logs/
 *.csv
 *.log
 *.tx
+*.ckpt
