@@ -1,386 +1,17 @@
-# # import torch
-# # import pytorch_lightning as pl
-# # from torch.utils.tensorboard import SummaryWriter
-# # from tqdm.autonotebook import tqdm
-# # import time
-# # import numpy as np
-# # import os
-# # import shutil
-# # import matplotlib
-# # matplotlib.use('Agg')
-# # import matplotlib.pyplot as plt
-
-# # def plot_convergence_curves(kan_losses, mlp_losses, fourier_losses, wavelet_losses, root_path, epoch=None):
-# #     convergence_dir = os.path.join(root_path, 'convergence_curves')
-    
-# #     if not os.path.exists(convergence_dir):
-# #         os.makedirs(convergence_dir)
-    
-# #     plt.figure()
-# #     plt.plot(kan_losses, label='Chebyshev KAN')
-# #     plt.plot(mlp_losses, label='MLP')
-# #     plt.plot(fourier_losses, label='Fourier KAN')
-# #     plt.plot(wavelet_losses, label='Wavelet KAN')
-# #     plt.yscale('log')
-# #     plt.xlabel('Epochs')
-# #     plt.ylabel('Loss')
-# #     plt.title('Convergence Curves')
-# #     plt.legend()
-# #     if epoch is not None:
-# #         plt.savefig(os.path.join(convergence_dir, f'convergence_curves_epoch_{epoch:04d}.png'))
-# #     else:
-# #         plt.savefig(os.path.join(convergence_dir, 'convergence_curves_final.png'))
-# #     plt.close()
-
-# # class ModelLightningModule(pl.LightningModule):
-# #     def __init__(self, model, loss_fn, lr, steps_til_summary, validation_fn=None):
-# #         super(ModelLightningModule, self).__init__()
-# #         self.model = model
-# #         self.loss_fn = loss_fn
-# #         self.lr = lr
-# #         self.steps_til_summary = steps_til_summary
-# #         self.validation_fn = validation_fn
-
-# #     def forward(self, x):
-# #         return self.model(x)
-
-# #     def training_step(self, batch, batch_idx):
-# #         model_input, gt = batch
-# #         model_output = self(model_input)
-# #         losses = self.loss_fn(model_output, gt)
-# #         train_loss = sum([loss.mean() for loss in losses.values()])
-# #         self.log('train_loss', train_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-# #         return train_loss
-
-# #     def validation_step(self, batch, batch_idx):
-# #         if self.validation_fn is not None:
-# #             self.validation_fn(self.model, batch_idx)
-        
-# #     def configure_optimizers(self):
-# #         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-# #         return optimizer
-
-# #     def on_epoch_end(self):
-# #         if self.current_epoch % self.steps_til_summary == 0:
-# #             torch.save(self.model.state_dict(), f"{self.model.__class__.__name__}_epoch_{self.current_epoch}.ckpt")
-
-# # class LinearDecaySchedule():
-# #     def __init__(self, start_val, final_val, num_steps):
-# #         self.start_val = start_val
-# #         self.final_val = final_val
-# #         self.num_steps = num_steps
-
-# #     def __call__(self, iter):
-# #         return self.start_val + (self.final_val - self.start_val) * min(iter / self.num_steps, 1.)
-
-# # import torch
-# # import pytorch_lightning as pl
-# # from torch.utils.tensorboard import SummaryWriter
-# # from tqdm.autonotebook import tqdm
-# # import time
-# # import numpy as np
-# # import os
-# # import shutil
-# # import matplotlib
-# # matplotlib.use('Agg')
-# # import matplotlib.pyplot as plt
-# # import pandas as pd
-
-# # # Check CUDA availability and GPU devices
-# # print("CUDA available:", torch.cuda.is_available())  # Should return True
-# # print("Number of GPUs:", torch.cuda.device_count())  # Should return 2
-# # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-# #     print("GPU 0:", torch.cuda.get_device_name(0))  # Should return the name of the first GPU
-# #     print("GPU 1:", torch.cuda.get_device_name(1))  # Should return the name of the second GPU
-
-
-# # def plot_convergence_curves(kan_losses, mlp_losses, fourier_losses, wavelet_losses, root_path, epoch=None):
-# #     convergence_dir = os.path.join(root_path, 'convergence_curves')
-    
-# #     if not os.path.exists(convergence_dir):
-# #         os.makedirs(convergence_dir)
-    
-# #     plt.figure()
-# #     plt.plot(kan_losses, label='Chebyshev KAN')
-# #     plt.plot(mlp_losses, label='MLP')
-# #     plt.plot(fourier_losses, label='Fourier KAN')
-# #     plt.plot(wavelet_losses, label='Wavelet KAN')
-# #     plt.yscale('log')
-# #     plt.xlabel('Epochs')
-# #     plt.ylabel('Loss')
-# #     plt.title('Convergence Curves')
-# #     plt.legend()
-# #     if epoch is not None:
-# #         plt.savefig(os.path.join(convergence_dir, f'convergence_curves_epoch_{epoch:04d}.png'))
-# #     else:
-# #         plt.savefig(os.path.join(convergence_dir, 'convergence_curves_final.png'))
-# #     plt.close()
-
-# # class ModelLightningModule(pl.LightningModule):
-# #     def __init__(self, model, loss_fn, lr, steps_til_summary, validation_fn=None):
-# #         super(ModelLightningModule, self).__init__()
-# #         self.model = model
-# #         self.loss_fn = loss_fn
-# #         self.lr = lr
-# #         self.steps_til_summary = steps_til_summary
-# #         self.validation_fn = validation_fn
-# #         self.iteration_times = []
-# #         self.total_training_times = []
-# #         self.losses = []
-
-# #     def forward(self, x):
-# #         return self.model(x)
-
-# #     def training_step(self, batch, batch_idx):
-# #         start_time = time.time()
-
-# #         model_input, gt = batch
-# #         model_output = self(model_input)
-# #         losses = self.loss_fn(model_output, gt)
-# #         train_loss = sum([loss.mean() for loss in losses.values()])
-# #         self.log('train_loss', train_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-
-# #         iteration_time = time.time() - start_time
-# #         self.iteration_times.append(iteration_time)
-# #         self.total_training_times.append(sum(self.iteration_times))
-        
-# #         self.log('iteration_time', iteration_time, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-# #         self.log('total_training_time', self.total_training_times[-1], on_step=True, on_epoch=True, prog_bar=True, logger=True)
-
-# #         self.losses.append(train_loss.item())
-# #         return train_loss
-
-# #     def validation_step(self, batch, batch_idx):
-# #         if self.validation_fn is not None:
-# #             self.validation_fn(self.model, batch_idx)
-
-# #     def configure_optimizers(self):
-# #         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-# #         return optimizer
-
-# #     def on_epoch_end(self):
-# #         if self.current_epoch % self.steps_til_summary == 0:
-# #             torch.save(self.model.state_dict(), f"{self.model.__class__.__name__}_epoch_{self.current_epoch}.ckpt")
-
-# # class LinearDecaySchedule():
-# #     def __init__(self, start_val, final_val, num_steps):
-# #         self.start_val = start_val
-# #         self.final_val = final_val
-# #         self.num_steps = num_steps
-
-# #     def __call__(self, iter):
-# #         return self.start_val + (self.final_val - self.start_val) * min(iter / self.num_steps, 1.)
-
-# # import torch
-# # import pytorch_lightning as pl
-# # from torch.utils.tensorboard import SummaryWriter
-# # from tqdm.autonotebook import tqdm
-# # import time
-# # import numpy as np
-# # import os
-# # import shutil
-# # import matplotlib
-# # matplotlib.use('Agg')
-# # import matplotlib.pyplot as plt
-# # import pandas as pd  # Ensure pandas is imported
-
-# # # Check CUDA availability and GPU devices
-# # print("CUDA available:", torch.cuda.is_available())  # Should return True
-# # print("Number of GPUs:", torch.cuda.device_count())  # Should return 2
-# # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-# #     print("GPU 0:", torch.cuda.get_device_name(0))  # Should return the name of the first GPU
-# #     print("GPU 1:", torch.cuda.get_device_name(1))  # Should return the name of the second GPU
-
-# # def plot_convergence_curves(kan_losses, mlp_losses, fourier_losses, wavelet_losses, root_path, epoch=None):
-# #     convergence_dir = os.path.join(root_path, 'convergence_curves')
-    
-# #     if not os.path.exists(convergence_dir):
-# #         os.makedirs(convergence_dir)
-    
-# #     plt.figure()
-# #     plt.plot(kan_losses, label='Chebyshev KAN')
-# #     plt.plot(mlp_losses, label='MLP')
-# #     plt.plot(fourier_losses, label='Fourier KAN')
-# #     plt.plot(wavelet_losses, label='Wavelet KAN')
-# #     plt.yscale('log')
-# #     plt.xlabel('Epochs')
-# #     plt.ylabel('Loss')
-# #     plt.title('Convergence Curves')
-# #     plt.legend()
-# #     if epoch is not None:
-# #         plt.savefig(os.path.join(convergence_dir, f'convergence_curves_epoch_{epoch:04d}.png'))
-# #     else:
-# #         plt.savefig(os.path.join(convergence_dir, 'convergence_curves_final.png'))
-# #     plt.close()
-
-# # class ModelLightningModule(pl.LightningModule):
-# #     def __init__(self, model, loss_fn, lr, steps_til_summary, validation_fn=None):
-# #         super(ModelLightningModule, self).__init__()
-# #         self.model = model
-# #         self.loss_fn = loss_fn
-# #         self.lr = lr
-# #         self.steps_til_summary = steps_til_summary
-# #         self.validation_fn = validation_fn
-# #         self.iteration_times = []
-# #         self.total_training_times = []
-# #         self.losses = []
-
-# #     def forward(self, x):
-# #         return self.model(x)
-
-# #     def training_step(self, batch, batch_idx):
-        
-
-# #         model_input, gt = batch
-# #         model_output = self(model_input)
-# #         losses = self.loss_fn(model_output, gt)
-# #         train_loss = sum([loss.mean() for loss in losses.values()])
-# #         self.log('train_loss', train_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-
-# #         iteration_time = time.time() - start_time
-# #         self.iteration_times.append(iteration_time)
-# #         self.total_training_times.append(sum(self.iteration_times))
-        
-# #         self.log('iteration_time', iteration_time, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-# #         self.log('total_training_time', self.total_training_times[-1], on_step=True, on_epoch=True, prog_bar=True, logger=True)
-
-# #         self.losses.append(train_loss.item())
-# #         return train_loss
-
-# #     def validation_step(self, batch, batch_idx):
-# #         if self.validation_fn is not None:
-# #             self.validation_fn(self.model, batch_idx)
-
-# #     def configure_optimizers(self):
-# #         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-# #         return optimizer
-
-# #     def on_epoch_end(self):
-# #         if self.current_epoch % self.steps_til_summary == 0:
-# #             torch.save(self.model.state_dict(), f"{self.model.__class__.__name__}_epoch_{self.current_epoch}.ckpt")
-
-# # class LinearDecaySchedule():
-# #     def __init__(self, start_val, final_val, num_steps):
-# #         self.start_val = start_val
-# #         self.final_val = final_val
-# #         self.num_steps = num_steps
-
-# #     def __call__(self, iter):
-# #         return self.start_val + (self.final_val - self.start_val) * min(iter / self.num_steps, 1.)
-
 # import torch
 # import pytorch_lightning as pl
 # from torch.utils.tensorboard import SummaryWriter
-# from tqdm.autonotebook import tqdm
 # import time
-# import numpy as np
 # import os
-# import shutil
 # import matplotlib
 # matplotlib.use('Agg')
 # import matplotlib.pyplot as plt
-# import pandas as pd  # Ensure pandas is imported
 # from pytorch_lightning.loggers import TensorBoardLogger
-# # def plot_convergence_curves(kan_losses, mlp_losses, fourier_losses, wavelet_losses, root_path, epoch=None):
-# #     convergence_dir = os.path.join(root_path, 'convergence_curves')
-    
-# #     if not os.path.exists(convergence_dir):
-# #         os.makedirs(convergence_dir)
-    
-# #     plt.figure()
-# #     plt.plot(kan_losses, label='Chebyshev KAN')
-# #     plt.plot(mlp_losses, label='MLP')
-# #     plt.plot(fourier_losses, label='Fourier KAN')
-# #     plt.plot(wavelet_losses, label='Wavelet KAN')
-# #     plt.yscale('log')
-# #     plt.xlabel('Epochs')
-# #     plt.ylabel('Loss')
-# #     plt.title('Convergence Curves')
-# #     plt.legend()
-# #     if epoch is not None:
-# #         plt.savefig(os.path.join(convergence_dir, f'convergence_curves_epoch_{epoch:04d}.png'))
-# #     else:
-# #         plt.savefig(os.path.join(convergence_dir, 'convergence_curves_final.png'))
-# # #     plt.close()
-
-
-# # class ModelLightningModule(pl.LightningModule):
-# #     def __init__(self, model, loss_fn, lr, steps_til_summary, validation_fn=None):
-# #         super(ModelLightningModule, self).__init__()
-# #         self.model = model
-# #         self.loss_fn = loss_fn
-# #         self.lr = lr
-# #         self.steps_til_summary = steps_til_summary
-# #         self.validation_fn = validation_fn
-# #         # self.iteration_times = []
-# #         self.total_training_times = []
-# #         self.losses = []
-# #         self.core_iteration_time = None  # To track the core computation time at the end of each epoch
-# #         self.train_loss_epoch = None  # To track the total training loss at the end of each epoch
-# #         #self.save_hyperparameters(ignore=['model'])
-
-
-
-# #     def forward(self, x):
-# #         return self.model(x)
-
-# #     # def on_after_backward(self):
-# #     # # Log parameter histograms
-# #     # for name, params in self.named_parameters():
-# #     #     self.logger.experiment.add_histogram(name, params, self.current_epoch)
-# #     #     if params.grad is not None:
-# #     #         self.logger.experiment.add_histogram(f'{name}_grad', params.grad, self.current_epoch)    
-
-# #     # def on_train_epoch_start(self):
-# #     #     self.start_time = time.time()  # Capture the start time of the epoch
-
-# #     def training_step(self, batch, batch_idx):
-
-# #         model_input, gt = batch
-# #         core_start_time = time.time()
-# #         model_output = self(model_input)
-# #         losses = self.loss_fn(model_output, gt)
-# #         self.train_loss_epoch = sum([loss.mean() for loss in losses.values()])  # Calculate total loss
-        
-# #         # Measure core computation time (excluding logging)
-# #         core_end_time = time.time()
-# #         self.core_iteration_time = core_end_time - core_start_time
-# #         self.total_training_times.append(self.core_iteration_time)
-# #         # Log the training loss both at each step and at the end of the epoch
-# #         # self.log('train_loss', train_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-# #         #self.log('iteration_time', self.core_iteration_time, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-# #         # Append the training loss for further analysis
-
-# #         return self.train_loss_epoch
-
-# #     def on_train_epoch_end(self):
-         
-# #         # Log iteration time and total training time at the end of each epoch
-# #         self.losses.append(train_loss_epoch.item())
-
-# #         self.log('train_loss', self.train_loss_epoch, on_epoch=True, prog_bar=True, logger=True)
-
-# #         self.log('iteration_time', self.core_iteration_time, on_epoch=True, prog_bar=True, logger=True)
-
-# #         # Save model checkpoint at specified intervals
-# #         if self.current_epoch % self.steps_til_summary == 0:
-# #             self.log('total_training_loss', sum(self.losses), on_epoch=True, prog_bar=True, logger=True)
-# #             self.log('total_training_time', sum(self.total_training_times), on_epoch=True, prog_bar=True, logger=True)
-# #             torch.save(self.model.state_dict(), f"{self.model.__class__.__name__}_epoch_{self.current_epoch}.ckpt")
-            
-        
-# #     def on_train_end(self):
-# #         # Save the final model
-
-# #         torch.save(self.model.state_dict(), f"{self.model.__class__.__name__}_final.ckpt")
-# #         self.log('final_total_training_loss', sum(self.losses), logger=True)
-# #         self.log('final_total_training_time', sum(self.total_training_times), logger=True)
-
 
 
 
 # class ModelLightningModule(pl.LightningModule):
-#     def __init__(self, model, loss_fn, lr, steps_til_summary, model_name, validation_fn=None):
+#     def __init__(self, model, loss_fn, lr, steps_til_summary, model_name, validation_fn=None, **kwargs):
 #         super(ModelLightningModule, self).__init__()
 #         self.model = model
 #         self.loss_fn = loss_fn
@@ -388,75 +19,62 @@
 #         self.steps_til_summary = steps_til_summary
 #         self.model_name = model_name
 #         self.validation_fn = validation_fn
-#         self.total_training_time = 0
-#         self.total_loss = 0
-#         self.core_iteration_time = None
-#         self.train_loss_epoch = None
+#         self.epoch_start_time = None
+#         self.epoch_end_time = None
+#         self.train_losses = []
+#         self.total_training_times = []
+#         self.iteration_times = []
+#         self.avg_losses = []
+#         self.batch_size = 1
+      
+
 
 #     def forward(self, x):
 #         return self.model(x)
 
+#     def on_train_epoch_start(self):
+#         self.epoch_start_time = time.time()
+
 #     def training_step(self, batch, batch_idx):
 #         model_input, gt = batch
-#         core_start_time = time.time()
 #         model_output = self(model_input)
 #         losses = self.loss_fn(model_output, gt)
-#         self.train_loss_epoch = sum([loss.mean() for loss in losses.values()])
-        
-#         core_end_time = time.time()
-#         self.core_iteration_time = core_end_time - core_start_time
-#         self.total_training_time += self.core_iteration_time
-#         self.total_loss += self.train_loss_epoch.item()
-
-#         return self.train_loss_epoch
+#         train_loss = 0
+#         train_loss = sum(loss.mean() for loss in losses.values())      
+#         self.train_losses.append(train_loss.item())
+#         self.log('train_loss', train_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True, logger=True)
+#         return train_loss
 
 #     def on_train_epoch_end(self):
-#         self.log(f'{self.model_name}/train_loss', self.train_loss_epoch, on_epoch=True, prog_bar=True, logger=True)
-#         self.log(f'{self.model_name}/iteration_time', self.core_iteration_time, on_epoch=True, prog_bar=True, logger=True)
-
-
-
-#         if self.current_epoch % self.steps_til_summary == 0:
-#             self.log(f'{self.model_name}/total_training_loss', self.total_loss, on_epoch=True, prog_bar=True, logger=True)
-#             self.log(f'{self.model_name}/total_training_time', self.total_training_time, on_epoch=True, prog_bar=True, logger=True)
-#             # checkpoint_path = os.path.join(self.logger.log_dir, f"{self.model_name}_epoch_{self.current_epoch + 1}.ckpt")
-#             # torch.save(self.model.state_dict(), checkpoint_path)
+#         self.epoch_end_time = time.time()
+#         epoch_training_time = self.epoch_end_time - self.epoch_start_time
+#         self.iteration_times.append(epoch_training_time)
+#         total_time = sum(self.iteration_times)
+#         self.total_training_times.append(total_time)
+#         # Calculate and store average loss for the epoch
+#         #print(f"avg_losses len: {len(self.train_losses)}")
+#         self.batch_size = len(self.train_losses)
+#         avg_loss = sum(self.train_losses) / self.batch_size
+#         self.avg_losses.append(avg_loss)
+#         #print(f'avg_losses len: {len(self.avg_losses)}')
+#         self.log('epoch_training_time', epoch_training_time, on_epoch=True, prog_bar=True, sync_dist = True, logger=True)
+#         self.log('total_training_time', total_time, on_epoch=True, prog_bar=True,logger=True)
+#         self.log('avg_train_loss_epoch', avg_loss, on_epoch=True, prog_bar=True,logger=True)
 
 #     def on_train_end(self):
-
-#         final_checkpoint_path = os.path.join(self.logger.log_dir, f"{self.model_name}_final.ckpt")
+#         checkpoint_dir = os.path.join(self.logger.log_dir, 'checkpoints')
+#         os.makedirs(checkpoint_dir, exist_ok=True)
+#         final_checkpoint_path = os.path.join(checkpoint_dir, f"{self.model_name}_final.ckpt")
 #         torch.save(self.model.state_dict(), final_checkpoint_path)
-#         #torch.save(self.model.state_dict(), f"{self.model.__class__.__name__}_final.ckpt")
-#         # self.log('final_total_training_loss', self.total_loss, logger=True)
-#         # self.log('final_total_training_time', self.total_training_time, logger=True)
-        
-#     # Log the final total training loss
-#         if isinstance(self.logger, TensorBoardLogger):
-#             self.logger.experiment.add_scalar(f'{self.model_name}/final_total_training_loss', self.total_loss, self.current_epoch)
-#         else:
-#             self.logger.log_metrics(f'{self.model_name}/final_total_training_loss', self.total_loss)
-#         # Log the final total training time
-#         if isinstance(self.logger, TensorBoardLogger):
-#             self.logger.experiment.add_scalar(f'{self.model_name}/final_total_training_time', self.total_training_time, self.current_epoch)
-#         else:
-#             self.logger.log_metrics(f'{self.model_name}/final_total_training_time', self.total_training_time)
 
+#         final_epoch_training_loss_text = f'Model: {self.model_name}, Final Epoch Training Loss: {self.avg_losses[-1]}'
+#         final_total_training_time_text = f'Model: {self.model_name}, Final Total Training Time: {self.total_training_times[-1]}'
+#         self.logger.experiment.add_text('Final Epoch Training Loss', final_epoch_training_loss_text, self.current_epoch)
+#         self.logger.experiment.add_text('Final Total Training Time', final_total_training_time_text, self.current_epoch)
 
 #     def validation_step(self, batch, batch_idx):
-#         pass
-
-
-#     # def validation_step(self, batch, batch_idx):
-#     #     model_input, gt = batch
-#     #     model_output = self(model_input)
-#     #     losses = self.loss_fn(model_output, gt)
-#     #     val_loss = sum([loss.mean() for loss in losses.values()])
-#     #     self.log('val_loss', val_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-#     #     return val_loss
-
-#     # def on_validation_epoch_end(self):
-#     # # If you want to perform any operations at the end of each validation epoch
-#     #     pass
+#         if self.validation_fn:
+#             return self.validation_fn(self, batch, batch_idx)
 
 #     def configure_optimizers(self):
 #         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -474,98 +92,127 @@
 
 import torch
 import pytorch_lightning as pl
-from torch.utils.tensorboard import SummaryWriter
-import time
+from torch.utils.data import DataLoader
 import os
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from pytorch_lightning.loggers import TensorBoardLogger
+import time
+
 
 class ModelLightningModule(pl.LightningModule):
-    def __init__(self, model, loss_fn, lr, steps_til_summary, model_name, validation_fn=None):
+    def __init__(self, model, loss_fn, lr, model_name, baseline_loss=float('inf')):
         super(ModelLightningModule, self).__init__()
         self.model = model
         self.loss_fn = loss_fn
         self.lr = lr
-        self.steps_til_summary = steps_til_summary
         self.model_name = model_name
-        self.validation_fn = validation_fn
-        self.total_training_time = 0
-        self.total_loss = 0
-        self.core_iteration_time = None
-        self.train_loss_epoch = None
-        self.train_losses = []
-        self.iteration_times = []
-        self.total_training_times = []
-        self.total_training_losses = []
-
+        self.baseline_loss = baseline_loss
+        self.total_train_loss_epoch = []
+        self.single_losses_epoch = {}
+        self.best_loss = float('inf')
+        self.best_epoch = 0
+        self.epoch_start_time = None
+        self.epoch_end_time = None
+        self.total_training_time = []
+        self.epoch_training_time = []
+        self.current_epoch_losses = None  
 
     def forward(self, x):
         return self.model(x)
 
+    def on_train_epoch_start(self):
+        self.epoch_start_time = time.time()
+
     def training_step(self, batch, batch_idx):
         model_input, gt = batch
-        core_start_time = time.time()
         model_output = self(model_input)
         losses = self.loss_fn(model_output, gt)
-        self.train_loss_epoch = sum([loss.mean() for loss in losses.values()])
-        
-        core_end_time = time.time()
-        self.core_iteration_time = core_end_time - core_start_time
-        self.total_training_time += self.core_iteration_time
-        self.total_loss += self.train_loss_epoch.item()
+        total_loss = sum(loss.mean() for loss in losses.values())
+        self.total_train_loss_epoch.append(total_loss.item())
+        self.current_epoch_losses = {name: value.mean().item() for name, value in losses.items()}
+        return total_loss
 
-        self.train_losses.append(self.train_loss_epoch.item())
-        self.iteration_times.append(self.core_iteration_time)
-        self.total_training_times.append(self.total_training_time)
-        self.total_training_losses.append(self.total_loss)
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
-        return self.train_loss_epoch
-
+    def save_checkpoint(self, filename):
+        checkpoint_path = os.path.join(self.logger.log_dir, 'checkpoints', filename)
+        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+        torch.save(self.state_dict(), checkpoint_path)
+    
 
     def on_train_epoch_end(self):
-            # Use consistent metric names across models, but tag with model name
-        self.log('train_loss_epoch', self.train_loss_epoch, on_epoch=True, prog_bar=True, logger=True)
-        #self.log(f'train_loss_epoch/{self.model_name}', self.train_loss_epoch, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('iteration_time', self.core_iteration_time, on_epoch=True, prog_bar=True, logger=True)
-        #self.log(f'iteration_time/{self.model_name}', self.core_iteration_time, on_step = False, on_epoch=True, prog_bar=True, logger=True)
+        self.epoch_end_time = time.time()
+        epoch_training_time = self.epoch_end_time - self.epoch_start_time
+        self.epoch_training_time.append(epoch_training_time)
+        total_time = sum(self.epoch_training_time)
+        self.total_training_time.append(total_time) 
+        for name, value in self.current_epoch_losses.items():
+            if name not in self.single_losses_epoch:
+                self.single_losses_epoch[name] = []
+            self.single_losses_epoch[name].append(value)
+            self.log(f'{name}_loss', value, on_epoch=True, prog_bar=True, logger=True)
+        self.log('train_loss_epoch',self.total_train_loss_epoch[-1], on_epoch=True, prog_bar=True,logger=True)
+        self.log('epoch_training_time', epoch_training_time, on_epoch=True, prog_bar=True, logger=True)
+        self.log('total_training_time', total_time, on_epoch=True, prog_bar=True,logger=True)
+        if self.current_epoch % 1000 == 0: 
+            checkpoint_filename = f"{self.model_name}_epoch_{self.current_epoch}.ckpt"
+            self.save_checkpoint(checkpoint_filename)
+            #self.plot_value_function(self.current_epoch) 
 
-        if self.current_epoch % self.steps_til_summary == 0:
-            self.log('total_training_loss', self.total_loss, on_epoch=True, prog_bar=True, logger=True)
-            self.log('total_training_time', self.total_training_time, on_epoch=True, prog_bar=True, logger=True)
-            #self.log(f'total_training_loss/{self.model_name}', self.total_loss, on_step = False, on_epoch=True, prog_bar=True, logger=True)
-            #self.log(f'total_training_time/{self.model_name}', self.total_training_time, on_step= False, on_epoch=True, prog_bar=True, logger=True)
+    def plot_value_function(self, epoch):
+        ckpt_dir = os.path.join(self.logger.log_dir, 'checkpoints')
+        os.makedirs(ckpt_dir, exist_ok=True)
+
+        times = [0., 0.5*(self.opt.tMax - 0.1), (self.opt.tMax - 0.1)]
+        num_times = len(times)
+        thetas = [-math.pi, -0.5*math.pi, 0., 0.5*math.pi, math.pi]
+        num_thetas = len(thetas)
+        fig = plt.figure(figsize=(5*num_times, 5*num_thetas))
+        sidelen = 200
+        mgrid_coords = self.dataio.get_mgrid(sidelen)
+
+        for i in range(num_times):
+            time_coords = torch.ones(mgrid_coords.shape[0], 1) * times[i]
+
+            for j in range(num_thetas):
+                theta_coords = torch.ones(mgrid_coords.shape[0], 1) * thetas[j]
+                theta_coords = theta_coords / (self.opt.angle_alpha * math.pi)
+                coords = torch.cat((time_coords, mgrid_coords, theta_coords), dim=1)
+                model_in = {'coords': coords.cuda()}
+                model_out = self.model(model_in)['model_out']
+                model_out = model_out.detach().cpu().numpy()
+                model_out = model_out.reshape((sidelen, sidelen))
+
+                norm_to = 0.02
+                mean = 0.25
+                var = 0.5
+                model_out = (model_out*var/norm_to) + mean
+                model_out = (model_out <= 0.001)*1.
+
+                ax = fig.add_subplot(num_times, num_thetas, (j+1) + i*num_thetas)
+                ax.set_title('t = %0.2f, theta = %0.2f' % (times[i], thetas[j]))
+                s = ax.imshow(model_out.T, cmap='bwr', origin='lower', extent=(-1., 1., -1., 1.))
+                fig.colorbar(s)
+
+        fig.savefig(os.path.join(ckpt_dir, 'BRS_validation_plot_epoch_%04d.png' % epoch))
 
 
     def on_train_end(self):
         
-        checkpoint_dir = os.path.join(self.logger.log_dir, 'checkpoints')
-        os.makedirs(checkpoint_dir, exist_ok=True)
-        final_checkpoint_path = os.path.join(checkpoint_dir, f"{self.model_name}_final.ckpt")
-        torch.save(self.model.state_dict(), final_checkpoint_path)
-
-        final_total_training_loss_text = f'Model: {self.model_name}, Final Total Training Loss: {self.total_loss}'
-        final_total_training_time_text = f'Model: {self.model_name}, Final Total Training Time: {self.total_training_time}'
-        
-            
-        self.logger.experiment.add_scalar('final_total_training_loss', self.total_loss, self.current_epoch)
-        self.logger.experiment.add_scalar('final_total_training_time', self.total_training_time, self.current_epoch)
-        self.logger.experiment.add_text('Final Total Training Loss', final_total_training_loss_text, self.current_epoch)
+        final_checkpoint = f"{self.model_name}_final.ckpt"
+        torch.save(self.state_dict(), final_checkpoint)
+        final_epoch_training_loss_text = f'Model: {self.model_name}, Final Epoch Training Loss: {self.total_train_loss_epoch[-1]}'
+        final_total_training_time_text = f'Model: {self.model_name}, Final Total Training Time: {self.total_training_time[-1]}'
+        self.logger.experiment.add_text('Final Epoch Training Loss', final_epoch_training_loss_text, self.current_epoch)
         self.logger.experiment.add_text('Final Total Training Time', final_total_training_time_text, self.current_epoch)
+        for name, values in self.single_losses_epoch.items():
+            final_loss = values[-1]
+            final_loss_text = f'Model: {self.model_name}, Final {name} Loss: {final_loss}'
+            self.logger.experiment.add_text(f'Final {name} Loss', final_loss_text, self.current_epoch)   
 
-    def validation_step(self, batch, batch_idx):
-        pass
 
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-        return optimizer
-
-class LinearDecaySchedule():
-    def __init__(self, start_val, final_val, num_steps):
-        self.start_val = start_val
-        self.final_val = final_val
-        self.num_steps = num_steps
-
-    def __call__(self, iter):
-        return self.start_val + (self.final_val - self.start_val) * min(iter / self.num_steps, 1.)
+    @classmethod
+    def load_from_checkpoint(cls, checkpoint_path, model, loss_fn, lr, model_name):
+        checkpoint = torch.load(checkpoint_path)
+        instance = cls(model, loss_fn, lr, model_name)
+        instance.load_state_dict(checkpoint)
+        return instance         

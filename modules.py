@@ -12,97 +12,36 @@ from collections import OrderedDict
 import math
 
 
-# T_n(x) = cos (n * arccos(x)) for x in [-1, 1]
-
-
-# class ChebyKANLayer(nn.Module):
-#     def __init__(self, input_dim, output_dim, degree):
-#         super(ChebyKANLayer, self).__init__()
-#         self.inputdim = input_dim
-#         self.outdim = output_dim
-#         self.degree = degree
-
-#         self.cheby_coeffs = nn.Parameter(torch.empty(input_dim, output_dim, degree + 1))
-#         nn.init.normal_(self.cheby_coeffs, mean=0.0, std=1 / (input_dim * (degree + 1)))
-#         self.register_buffer("arange", torch.arange(0, degree + 1, 1))
-
-#     def forward(self, x):
-#         print(f"Input to ChebyKANLayer: {x.shape}")
-#         x = torch.tanh(x)
-#         x = x.view((-1, self.inputdim, 1)).expand(
-#             -1, -1, self.degree + 1
-#         )
-#         #print(f"Expanded input to ChebyKANLayer: {x.shape}")
-#         x = x.acos()
-#         x *= self.arange
-#         x = x.cos()
-#         y = torch.einsum(
-#             "bid,iod->bo", x, self.cheby_coeffs
-#         )
-
-#         y = y.view(1, -1, 1) 
-#         #print(f"Output from ChebyKANLayer: {y.shape}")
-#         return y
-
-
 class ChebyKANLayer(nn.Module):
     def __init__(self, input_dim, output_dim, degree):
         super(ChebyKANLayer, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.degree = degree
-
-        self.cheby_coeffs = nn.Parameter(torch.randn(input_dim, output_dim, degree + 1) / (input_dim * (degree + 1)))
+        self.cheby_coeffs = nn.Parameter(torch.empty(input_dim, output_dim, degree + 1))
+        nn.init.normal_(self.cheby_coeffs, mean=0.0, std=1 / (input_dim * (degree + 1)))
         self.register_buffer("arange", torch.arange(degree + 1).view(1, 1, -1))
 
     def forward(self, x):
-
-        x = x.view(-1, self.input_dim)
-        x = torch.tanh(x)
-        #print(f"Input to ChebyKANLayer: {x.shape}")
-        x = x.unsqueeze(-1)  # Shape: (batch_size, input_dim, 1)
-        #print(f"arange tensor shape: {self.arange.shape}")
-        
-        # Compute Chebyshev polynomials efficiently
+        x = torch.tanh(x.view(-1, self.input_dim)).unsqueeze(-1)
         cheby_polys = torch.cos(self.arange * torch.acos(x))
-        #print(f"Output from ChebyKANLayer after cos: {cheby_polys.shape}")
-        #print(f"Cheby coeffs shape: {self.cheby_coeffs.shape}")
-        # Use batch matrix multiplication
         y = torch.einsum('bid,iod->bo', cheby_polys, self.cheby_coeffs)
-
-
-        #print(f"Output from ChebyKANLayer after einsum: {y.shape}")
-
-        
         return y.view(1, -1, 1)
-
-
 
 class ChebyshevNetwork(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, output_dim, cheby_degree):
         super(ChebyshevNetwork, self).__init__()
-        layers = []
-
-        # Adding the first ChebyKANLayer
-        layers.append(('cheby_1', ChebyKANLayer(input_dim, hidden_dim, cheby_degree)))
-
-        # Adding subsequent ChebyKANLayer layers
+        layers = [('cheby_1', ChebyKANLayer(input_dim, hidden_dim, cheby_degree))]
         for i in range(num_layers - 1):
             layers.append((f'cheby_{i+2}', ChebyKANLayer(hidden_dim, hidden_dim, cheby_degree)))
-
-        # Adding the final ChebyKANLayer which outputs to the required output_dim
         layers.append((f'cheby_final', ChebyKANLayer(hidden_dim, output_dim, cheby_degree)))
-
-        # Creating the model as an ordered dictionary
         self.model = nn.Sequential(OrderedDict(layers))
 
     def forward(self, x):
         return self.model(x)
 
-
 class SingleBVPNetwithKAN(nn.Module):
     '''A canonical representation network for a BVP using Chebyshev networks.'''
-
     def __init__(self, out_features=1, in_features=2, hidden_features=256, num_hidden_layers=3, chebyshev_degree=5, **kwargs):
         super().__init__()
         self.net = ChebyshevNetwork(input_dim=in_features, hidden_dim=hidden_features, num_layers=num_hidden_layers,
@@ -110,136 +49,44 @@ class SingleBVPNetwithKAN(nn.Module):
         print(self)
 
     def forward(self, model_input, params=None):
-        if params is None:
-            params = OrderedDict(self.named_parameters())
-
-        # Enables us to compute gradients w.r.t. coordinates
         coords_org = model_input['coords'].clone().detach().requires_grad_(True)
-        coords = coords_org
-
-        output = self.net(coords)
+        output = self.net(coords_org)
         return {'model_in': coords_org, 'model_out': output}
-    
-#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-# class FourierKANLayer(nn.Module):
-#     def __init__(self, input_dim, output_dim, num_terms, learnable_frequencies=False):
-#         super(FourierKANLayer, self).__init__()
-#         self.input_dim = input_dim
-#         self.output_dim = output_dim
-#         self.num_terms = num_terms
-#         self.learnable_frequencies = learnable_frequencies
-        
-#         # Learnable fundamental frequency (gridsize)
-#         self.gridsize_param = nn.Parameter(torch.tensor(1.0, dtype=torch.float32))
-        
-#         # Learnable frequency factors (if enabled)
-#         if learnable_frequencies:
-#             self.frequency_factors = nn.Parameter(torch.randn(output_dim, input_dim, num_terms))
-#         else:
-#             self.register_buffer('frequency_factors', torch.arange(1, num_terms + 1).unsqueeze(0).unsqueeze(0).expand(output_dim, input_dim, -1).float())
-        
-#         # Learnable Fourier coefficients
-#         self.fouriercoeffs = nn.Parameter(torch.empty(2, output_dim, input_dim, num_terms))
-#         nn.init.xavier_uniform_(self.fouriercoeffs)
 
-    
-
-#     def forward(self, x):
-#         print(f"Input to FourierKANLayer: {x.shape}")
-
-   
-#         x = x.view((-1, self.input_dim, 1)).expand(         #[batch_size, input_dim, num_terms]
-#             -1, -1, self.num_terms
-#         )
-#         print(f"Expanded input to FourierKANLayer: {x.shape}")
-            
-#             # Compute the Fourier series terms
-#         frequencies = self.frequency_factors / self.gridsize_param
-#         print(f"Frequencies shape: {frequencies.shape}")       #[output_dim, input_dim, num_terms]
-        
-#         angles = 2 * math.pi * frequencies.unsqueeze(0) * x.unsqueeze(1)
-        
-#         print(f"Angles shape: {angles.shape}")
-#         print(f"Fourier Coeffs shape: {self.fouriercoeffs.shape}")
-            
-#             # Compute cosine and sine terms
-#         cos_terms = torch.cos(angles) * self.fouriercoeffs[0].unsqueeze(0)
-#         sin_terms = torch.sin(angles) * self.fouriercoeffs[1].unsqueeze(0)
-            
-#             # Sum over input features and frequencies
-#         output = torch.sum(cos_terms + sin_terms, dim=(2, 3))
-#         output = output.view(1, -1, 1)
-            
-#         print(f"Output from FourierKANLayer: {output.shape}")
-#         return output       
-
+#-----------------------------------------------------------------------------------------------------------------------------------------------------        
 
 class FourierKANLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, num_terms, learnable_frequencies=False):
+    def __init__(self, input_dim, output_dim, num_terms, gridsize_param=2.0):
         super(FourierKANLayer, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.num_terms = num_terms
-        self.learnable_frequencies = learnable_frequencies
-        
-        # Learnable fundamental frequency (gridsize)
-        self.gridsize_param = nn.Parameter(torch.tensor(10.0, dtype=torch.float32))
-        
-        # Learnable frequency factors (if enabled)
-        if learnable_frequencies:
-            self.frequency_factors = nn.Parameter(torch.randn(input_dim, num_terms))
-        else:
-            self.register_buffer('frequency_factors', torch.arange(1, num_terms + 1).unsqueeze(0).expand(input_dim, -1).float())
-        
-        # Learnable Fourier coefficients
-        # self.fouriercoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, num_terms))
-        # nn.init.xavier_uniform_(self.fouriercoeffs)
-
+        # self.learnable_frequencies = learnable_frequencies
+        # if learnable_frequencies:
+        #     self.frequency_factors = nn.Parameter(torch.randn(input_dim, num_terms))
+        # else:
+        self.gridsize_param = gridsize_param
+        # self.gridsize_param = nn.Parameter(torch.tensor(2.0, dtype=torch.float32))  # For x1 and x2 in [-1, 1]
+        self.register_buffer('frequency_factors', torch.arange(1, num_terms + 1).unsqueeze(0).expand(input_dim, -1).float())
         self.fouriercoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, num_terms))
         nn.init.normal_(self.fouriercoeffs, mean=0.0, std=1 / (input_dim * num_terms * 2))
 
     def forward(self, x):
-        #print(f"Input to FourierKANLayer: {x.shape}")
-
         x = x.view(-1, self.input_dim, 1)
-        #print(f"Reshaped input to FourierKANLayer: {x.shape}")
-            
-        # Compute the Fourier series terms
         frequencies = self.frequency_factors / self.gridsize_param
-        #print(f"Frequencies shape: {frequencies.shape}")
-        
         angles = 2 * math.pi * frequencies.unsqueeze(0) * x
-        #print(f"Angles shape: {angles.shape}")
-        
-        # Compute cosine and sine terms
         fourier_terms = torch.stack([torch.cos(angles), torch.sin(angles)], dim=-2)
-        #print(f"Fourier terms shape: {fourier_terms.shape}")
-        
-        # Multiply with Fourier coefficients and sum
         output = torch.einsum('bifd,iofd->bo', fourier_terms, self.fouriercoeffs)
-        output = output.view(1, -1, 1)
-            
-        #print(f"Output from FourierKANLayer: {output.shape}")
-        return output
-
+        return output.view(1, -1, 1)
 
 class FourierKANNetwork(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, output_dim, num_terms, learnable_frequencies=True):
+    def __init__(self, input_dim, hidden_dim, num_layers, output_dim, num_terms, gridsize_param=2.0):
         super(FourierKANNetwork, self).__init__()
-        layers = []
-
-        # Adding the first FourierKANLayer
-        layers.append(('fourier_1', FourierKANLayer(input_dim, hidden_dim, num_terms, learnable_frequencies)))
-
-        # Adding subsequent FourierKANLayer layers
+        layers = [('fourier_1', FourierKANLayer(input_dim, hidden_dim, num_terms, gridsize_param))]
         for i in range(num_layers - 1):
-            layers.append((f'fourier_{i+2}', FourierKANLayer(hidden_dim, hidden_dim, num_terms, learnable_frequencies)))
-
-        # Adding the final FourierKANLayer which outputs to the required output_dim
-        layers.append((f'fourier_final', FourierKANLayer(hidden_dim, output_dim, num_terms, learnable_frequencies)))
-
-        # Creating the model as an ordered dictionary
+            layers.append((f'fourier_{i+2}', FourierKANLayer(hidden_dim, hidden_dim, num_terms, gridsize_param)))
+        layers.append((f'fourier_final', FourierKANLayer(hidden_dim, output_dim, num_terms, gridsize_param)))
         self.model = nn.Sequential(OrderedDict(layers))
 
     def forward(self, x):
@@ -247,131 +94,121 @@ class FourierKANNetwork(nn.Module):
 
 class SingleBVPNetwithFourier(nn.Module):
     '''A canonical representation network for a BVP using Fourier KAN networks.'''
-
-    def __init__(self, out_features=1, in_features=2, hidden_features=256, num_hidden_layers=3, num_terms=6, learnable_frequencies=False, **kwargs):
+    def __init__(self, out_features=1, in_features=2, hidden_features=256, num_hidden_layers=3, num_terms=1, gridsize_param = 2.0, **kwargs):
         super().__init__()
         self.net = FourierKANNetwork(
             input_dim=in_features, 
             hidden_dim=hidden_features, 
             num_layers=num_hidden_layers,
             output_dim=out_features, 
-            num_terms=num_terms,
-            learnable_frequencies=learnable_frequencies
+            num_terms=num_terms
         )
         print(self)
 
     def forward(self, model_input, params=None):
-        if params is None:
-            params = OrderedDict(self.named_parameters())
-
-        # Enables us to compute gradients w.r.t. coordinates
         coords_org = model_input['coords'].clone().detach().requires_grad_(True)
-        coords = coords_org
+        output = self.net(coords_org)
+        return {'model_in': coords_org, 'model_out': output}
 
-        output = self.net(coords)
-        return {'model_in': coords_org, 'model_out': output} 
-
-#------------------------------------------------------------------------------------------
 # class WaveletKANLayer(nn.Module):
-#     def __init__(self, input_dim, output_dim, initial_gridsize=10):
+#     def __init__(self, input_dim, output_dim, gridsize_param =2):
+#         super(WaveletKANLayer, self).__init__()
+#         self.input_dim = input_dim
+#         self.output_dim = output_dim
+#         self.gridsize_param = gridsize_param
+#         self.waveletcoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, initial_gridsize))
+#         nn.init.normal_(self.waveletcoeffs, mean=0.0, std=1 / (input_dim * initial_gridsize * 2))
+
+#     def forward(self, x):
+#         # gridsize = torch.clamp(self.gridsize_param, min=1).round().int()
+#         x = x.view(-1, self.input_dim, 1)
+#         scales = torch.linspace(1, gridsize, gridsize, device=x.device).view(1, 1, -1)
+#         translations = torch.linspace(0, 1, gridsize, device=x.device).view(1, 1, -1)
+#         u = (x - translations) * scales
+#         wavelet_terms = torch.stack([torch.cos(math.pi * u) * torch.exp(-u**2 / 2.), torch.sin(math.pi * u) * torch.exp(-u**2 / 2.)], dim=-2)
+#         y = torch.einsum('bifd,iofd->bo', wavelet_terms, self.waveletcoeffs[..., :gridsize])
+#         return y.view(1, -1, 1)
+
+
+# class WaveletKANLayer(nn.Module):
+#     def __init__(self, input_dim, output_dim, initial_num_scales=3):
+#         super(WaveletKANLayer, self).__init__()
+#         self.input_dim = input_dim
+#         self.output_dim = output_dim
+#         self.initial_num_scales = initial_num_scales
+        
+#         # Initialize learnable parameters for scales
+#         self.scales = nn.Parameter(torch.linspace(1, self.initial_num_scales, self.initial_num_scales, dtype=torch.float32))
+        
+#         # Fixed translations covering [-1, 1]
+#         self.register_buffer('translations', torch.linspace(-1, 1, self.initial_num_scales, dtype=torch.float32))
+        
+#         # Initialize learnable wavelet coefficients
+#         self.waveletcoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, self.initial_num_scales))
+#         nn.init.normal_(self.waveletcoeffs, mean=0.0, std=1 / (input_dim * self.initial_num_scales * 2))
+
+#     def forward(self, x):
+#         # Ensure x has the correct shape
+#         x = x.view(-1, self.input_dim, 1)
+        
+#         # Apply scaling and translation
+#         scales = self.scales.view(1, 1, -1)
+#         translations = self.translations.view(1, 1, -1)
+#         u = (x - translations) * scales
+        
+#         # Define the Morlet wavelet basis functions
+#         wavelet_terms = torch.stack([torch.cos(math.pi * u) * torch.exp(-u**2 / 2.),
+#                                      torch.sin(math.pi * u) * torch.exp(-u**2 / 2.)], dim=-2)
+        
+#         # Compute the wavelet transform
+#         y = torch.einsum('bifd,iofd->bo', wavelet_terms, self.waveletcoeffs)
+        
+#         return y.view(1, -1, 1)
+
+
+
+#  class WaveletKANLayer(nn.Module):
+#     def __init__(self, input_dim, output_dim, initial_num_scales=1):
 #         super(WaveletKANLayer, self).__init__()
 #         self.input_dim = input_dim
 #         self.output_dim = output_dim
         
-#         # Learnable gridsize parameter
-#         self.gridsize_param = nn.Parameter(torch.tensor(initial_gridsize, dtype=torch.float32))
+#         # Initialize learnable parameters for scales
+#         self.scales = nn.Parameter(torch.linspace(1, initial_num_scales, initial_num_scales, dtype=torch.float32))
         
-#         # Wavelet coefficients as a learnable parameter
-#         self.waveletcoeffs = nn.Parameter(torch.empty(2, output_dim, input_dim, initial_gridsize))
-#         nn.init.xavier_uniform_(self.waveletcoeffs)
+#         # Fixed translations covering [-1, 1]
+#         self.register_buffer('translations', torch.linspace(-1, 1, initial_num_scales, dtype=torch.float32))
         
-#         # Optional bias term
-#         #self.bias = nn.Parameter(torch.zeros(output_dim))
-        
+#         # Initialize learnable wavelet coefficients
+#         self.waveletcoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, initial_num_scales))
+#         nn.init.normal_(self.waveletcoeffs, mean=0.0, std=1 / (input_dim * initial_num_scales * 2))
+
 #     def forward(self, x):
-#         gridsize = torch.clamp(self.gridsize_param, min=1).round().int()
-        
-#         # Reshape input for processing
+#         # Ensure x has the correct shape
 #         x = x.view(-1, self.input_dim, 1)
-#         print(f"Input to WaveletKANLayer: {x.shape}")
         
-#         scales = torch.linspace(1, gridsize, gridsize, device=x.device).unsqueeze(0).unsqueeze(0)
-#         translations = torch.linspace(0, 1, gridsize, device=x.device).unsqueeze(0).unsqueeze(0)
-        
+#         # Apply scaling and translation
+#         scales = self.scales.view(1, 1, -1)
+#         translations = self.translations.view(1, 1, -1)
 #         u = (x - translations) * scales
-#         real = torch.cos(math.pi * u) * torch.exp(-u**2 / 2.).unsqueeze(1)
-#         imag = torch.sin(math.pi * u) * torch.exp(-u**2 / 2.).unsqueeze(1)
-#         print(f"Real shape: {real.shape}")
-#         print(f"self.waveletcoeffs shape: {self.waveletcoeffs[0, :, :, :gridsize].shape}")
-#         y_real = torch.sum(real * self.waveletcoeffs[0, :, :, :gridsize].unsqueeze(0), dim=(2, 3))
-#         y_imag = torch.sum(imag * self.waveletcoeffs[1, :, :, :gridsize].unsqueeze(0), dim=(2, 3))
-#         y = y_real + y_imag
-#         # Reshape output to match expected format
-#         y = y.view(1, -1, self.output_dim)
         
-#         return y
+#         # Define the Morlet wavelet basis functions
+#         wavelet_terms = torch.stack([torch.cos(math.pi * u) * torch.exp(-u**2 / 2.),
+#                                      torch.sin(math.pi * u) * torch.exp(-u**2 / 2.)], dim=-2)
+        
+#         # Compute the wavelet transform
+#         y = torch.einsum('bifd,iofd->bo', wavelet_terms, self.waveletcoeffs)
+        
+#         return y.view(1, -1, 1)       
 
-class WaveletKANLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, initial_gridsize=10):
-        super(WaveletKANLayer, self).__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        
-        # Learnable gridsize parameter
-        self.gridsize_param = nn.Parameter(torch.tensor(initial_gridsize, dtype=torch.float32))
-        
-        # Wavelet coefficients as a learnable parameter
-        # self.waveletcoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, initial_gridsize))
-        # nn.init.xavier_uniform_(self.waveletcoeffs)
-
-        self.waveletcoeffs = nn.Parameter(torch.empty(input_dim, output_dim, 2, initial_gridsize))
-        nn.init.normal_(self.waveletcoeffs, mean=0.0, std=1 / (input_dim * initial_gridsize * 2))
-        
-    def forward(self, x):
-        #print(f"Input to WaveletKANLayer: {x.shape}")
-        
-        gridsize = torch.clamp(self.gridsize_param, min=1).round().int()
-        
-        # Reshape input for processing
-        x = x.view(-1, self.input_dim, 1)
-        #print(f"Reshaped input to WaveletKANLayer: {x.shape}")
-        
-        scales = torch.linspace(1, gridsize, gridsize, device=x.device).view(1, 1, -1)
-        translations = torch.linspace(0, 1, gridsize, device=x.device).view(1, 1, -1)
-        
-        u = (x - translations) * scales
-        #print(f"u shape: {u.shape}")
-        
-        # Compute wavelet terms
-        wavelet_terms = torch.stack([
-            torch.cos(math.pi * u) * torch.exp(-u**2 / 2.),
-            torch.sin(math.pi * u) * torch.exp(-u**2 / 2.)
-        ], dim=-2)
-        #print(f"Wavelet terms shape: {wavelet_terms.shape}")
-        
-        # Multiply with wavelet coefficients and sum
-        y = torch.einsum('bifd,iofd->bo', wavelet_terms, self.waveletcoeffs[..., :gridsize])
-        y = y.view(1, -1, 1)
-        
-        #print(f"Output from WaveletKANLayer: {y.shape}")
-        return y
 
 class WaveletKANNetwork(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, output_dim, initial_gridsize=10):
         super(WaveletKANNetwork, self).__init__()
-        layers = []
-
-        # Adding the first WaveletKANLayer
-        layers.append(('wavelet_1', WaveletKANLayer(input_dim, hidden_dim, initial_gridsize)))
-
-        # Adding subsequent WaveletKANLayer layers
+        layers = [('wavelet_1', WaveletKANLayer(input_dim, hidden_dim, initial_gridsize))]
         for i in range(num_layers - 1):
             layers.append((f'wavelet_{i+2}', WaveletKANLayer(hidden_dim, hidden_dim, initial_gridsize)))
-
-        # Adding the final WaveletKANLayer which outputs to the required output_dim
         layers.append((f'wavelet_final', WaveletKANLayer(hidden_dim, output_dim, initial_gridsize)))
-
-        # Creating the model as an ordered dictionary
         self.model = nn.Sequential(OrderedDict(layers))
 
     def forward(self, x):
@@ -379,7 +216,6 @@ class WaveletKANNetwork(nn.Module):
 
 class SingleBVPNetwithWavelet(nn.Module):
     '''A canonical representation network for a BVP using Wavelet KAN networks.'''
-
     def __init__(self, out_features=1, in_features=2, hidden_features=256, num_hidden_layers=3, initial_gridsize=10, **kwargs):
         super().__init__()
         self.net = WaveletKANNetwork(
@@ -392,16 +228,11 @@ class SingleBVPNetwithWavelet(nn.Module):
         print(self)
 
     def forward(self, model_input, params=None):
-        if params is None:
-            params = OrderedDict(self.named_parameters())
-
-        # Enables us to compute gradients w.r.t. coordinates
         coords_org = model_input['coords'].clone().detach().requires_grad_(True)
-        coords = coords_org
-
-        output = self.net(coords)
+        output = self.net(coords_org)
         return {'model_in': coords_org, 'model_out': output}
-#------------------------------------------------------------------------------------------
+
+
 class BatchLinear(nn.Linear):
     '''A linear layer'''
     __doc__ = nn.Linear.__doc__
@@ -567,6 +398,12 @@ def first_layer_sine_init(m):
         if hasattr(m, 'weight'):
             num_input = m.weight.size(-1)
             m.weight.uniform_(-1 / num_input, 1 / num_input)
+
+
+
+
+
+
 
 
 
