@@ -130,7 +130,7 @@ dmypy.json
 fri_logs/
 friday_logs/
 friday_logs_2/
-lightening_logs/
+lightning_logs/
 logs/
 resources/
 tbs_logs/
