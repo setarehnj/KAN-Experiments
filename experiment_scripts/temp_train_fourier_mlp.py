@@ -212,8 +212,7 @@ loss_fn = loss_functions.initialize_hji_air3D(dataset, opt.minWith)
 
 
 root_path = os.path.join(opt.logging_root, opt.experiment_name)
-tensorboard_dir = "Aug_6_fourier_num_terms=1_lr=2e-5"
-
+tensorboard_dir = "Aug6_all_models"
 # Create the main logging directory
 os.makedirs(root_path, exist_ok=True)
     
@@ -226,7 +225,7 @@ fourier_logger = TensorBoardLogger(save_dir=tensorboard_path, name="fourier")
 
 
 
-# fourier_lightning = ModelLightningModule(fourier_model, loss_fn, opt.lr, model_name='fourier', baseline_loss=322.0)
+fourier_lightning = ModelLightningModule(fourier_model, loss_fn, opt.lr, model_name='fourier', baseline_loss=322.0)
 
 checkpoint_callback = ModelCheckpoint(
     dirpath=os.path.join(root_path, 'checkpoints'),
@@ -241,9 +240,9 @@ checkpoint_callback = ModelCheckpoint(
 
 
 # # Create a PyTorch Lightning trainer with the generation callback
-# trainer_fourier = pl.Trainer(max_epochs=opt.fourier_num_epochs, accelerator='gpu', devices=[0], logger=fourier_logger, log_every_n_steps = 1,  callbacks=[checkpoint_callback]) 
+trainer_fourier = pl.Trainer(max_epochs=opt.fourier_num_epochs, accelerator='gpu', devices=[0], logger=fourier_logger, log_every_n_steps = 1,  callbacks=[checkpoint_callback]) 
 
-# trainer_fourier.fit(fourier_lightning, dataloader)
+trainer_fourier.fit(fourier_lightning, dataloader)
 
 # lightning_modules = [fourier_lightning]
 
@@ -260,45 +259,45 @@ checkpoint_callback = ModelCheckpoint(
 # root_path = '/home/setareh/alltogether/deepreach/logs/Aug2_small_experiment/checkpoints'
 # checkpoint_name = 'fourier-epoch=10999-train_loss_epoch=63.29.ckpt'
 
-best_model_path= '/home/setareh/alltogether/deepreach/logs/Aug6/Aug_6_fourier_num_terms=1/fourier/version_0/checkpoints/fourier_epoch_93000.ckpt'
+#best_model_path= '/home/setareh/alltogether/deepreach/logs/Aug6/Aug_6_fourier_num_terms=1/fourier/version_0/checkpoints/fourier_epoch_93000.ckpt'
 
 
 # best_model_path = os.path.join(root_path, checkpoint_name)
 
 
 # Create a new checkpoint callback for fine-tuning
-finetuning_checkpoint_callback = ModelCheckpoint(
-    dirpath=os.path.join(root_path, 'finetuning_checkpoints'),
-    filename='finetuned-fourier-{epoch:02d}-{train_loss_epoch:.2f}',
-    save_top_k=50,
-    verbose=True,
-    save_last=True,
-    monitor='train_loss_epoch',
-    mode='min',
-    every_n_epochs=100
-)
+# finetuning_checkpoint_callback = ModelCheckpoint(
+#     dirpath=os.path.join(root_path, 'finetuning_checkpoints'),
+#     filename='finetuned-fourier-{epoch:02d}-{train_loss_epoch:.2f}',
+#     save_top_k=50,
+#     verbose=True,
+#     save_last=True,
+#     monitor='train_loss_epoch',
+#     mode='min',
+#     every_n_epochs=100
+# )
 
 
-print(f"Loading checkpoint from {best_model_path}")
-best_model = ModelLightningModule.load_from_checkpoint(
-    best_model_path,
-    model=fourier_model, 
-    loss_fn=loss_fn, 
-    lr=opt.lr,        # Reduce learning rate for fine-tuning
-    model_name='fourier'
-)
+# print(f"Loading checkpoint from {best_model_path}")
+# best_model = ModelLightningModule.load_from_checkpoint(
+#     best_model_path,
+#     model=fourier_model, 
+#     loss_fn=loss_fn, 
+#     lr=opt.lr,        # Reduce learning rate for fine-tuning
+#     model_name='fourier'
+# )
 
-print(f"Loaded checkpoint. Continuing training for {opt.fourier_num_epochs} epochs with learning rate {opt.lr}")
+# print(f"Loaded checkpoint. Continuing training for {opt.fourier_num_epochs} epochs with learning rate {opt.lr}")
 
-# Create a new trainer for fine-tuning
-finetuning_trainer = pl.Trainer(
-    max_epochs=opt.fourier_num_epochs,       # Add more epochs for fine-tuning
-    accelerator='gpu',
-    devices=[1],
-    logger=fourier_logger,
-    log_every_n_steps=1,
-    callbacks=[finetuning_checkpoint_callback]  # Use the new checkpoint callback
-)
+# # Create a new trainer for fine-tuning
+# finetuning_trainer = pl.Trainer(
+#     max_epochs=opt.fourier_num_epochs,       # Add more epochs for fine-tuning
+#     accelerator='gpu',
+#     devices=[1],
+#     logger=fourier_logger,
+#     log_every_n_steps=1,
+#     callbacks=[finetuning_checkpoint_callback]  # Use the new checkpoint callback
+# )
 
-# Fine-tune the model
-finetuning_trainer.fit(best_model, dataloader)
+# # Fine-tune the model
+# finetuning_trainer.fit(best_model, dataloader)
