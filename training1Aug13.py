@@ -156,28 +156,38 @@ class ModelLightningModule(pl.LightningModule):
         
         # Compute gradients for each loss component
         for name, loss in losses.items():
-            self.manual_backward(loss.mean(), retain_graph=True)
-            grad_dict = {}
-            for param_name, param in self.model.named_parameters():
-                if param.grad is not None:
-                    grad_values = param.grad.abs().detach().cpu().numpy().flatten()
-                    grad_dict[param_name] = grad_values
-                    all_gradients[name].extend(grad_values)
-            self.single_losses_gradient_epoch[name] = grad_dict
+            loss_mean = loss.mean()
+            print(f"{name} loss value: {loss_mean.item()} | requires_grad: {loss_mean.requires_grad}")  # Debug print
+            if loss_mean.item() != 0 and loss_mean.requires_grad:
+                self.manual_backward(loss_mean, retain_graph=True)
+            
+                grad_dict = {}
+                for param_name, param in self.model.named_parameters():
+                    if param.grad is not None:
+                        grad_values = param.grad.abs().detach().cpu().numpy().flatten()
+                        grad_dict[param_name] = grad_values
+                        all_gradients[name].extend(grad_values)
+                self.single_losses_gradient_epoch[name] = grad_dict
+           # Log gradients
+                for param_name, grad_value in grad_dict.items():
+                    self.log(f'{name}_grad_{param_name}', np.mean(grad_value), on_epoch=True, prog_bar=False, logger=True)
+            
             if name not in self.single_losses_epoch:
                 self.single_losses_epoch[name] = []
             self.single_losses_epoch[name].append(loss.mean().item())
             self.log(f'{name}_loss', loss, on_epoch=True, prog_bar=True, logger=True)
-            # Log gradients
-            for param_name, grad_value in grad_dict.items():
-                self.log(f'{name}_grad_{param_name}', np.mean(grad_value), on_epoch=True, prog_bar=False, logger=True)
-            
             # Clear gradients for the next loss component
             self.optimizer.zero_grad()
 
+
         for name, grads in all_gradients.items():
-            max_grad = np.max(grads)
-            mean_abs_grad = np.mean(np.abs(grads))
+            if grads:
+                max_grad = np.max(grads)
+                mean_abs_grad = np.mean(np.abs(grads))
+            else: 
+                max_grad = 0
+                mean_abs_grad = 0
+
             if name not in self.max_grad_components:
                 self.max_grad_components[name] = []
             self.max_grad_components[name].append(max_grad)
@@ -203,7 +213,10 @@ class ModelLightningModule(pl.LightningModule):
         if self.current_epoch % self.histogram_log_frequency == 0:
             self.gradient_histograms[self.current_epoch] = all_gradients
 
-        return total_loss
+
+    def configure_optimizers(self):
+        return self.optimizer
+    
 
     def save_checkpoint(self, filename):
         checkpoint_path = os.path.join(self.logger.log_dir, 'checkpoints', filename)
@@ -247,7 +260,7 @@ class ModelLightningModule(pl.LightningModule):
 
     def on_train_end(self):
         final_checkpoint = f"{self.model_name}_final.ckpt"
-        torch.save(self.state_dict(), final_checkpoint)
+        self.save_checkpoint(final_checkpoint)
         final_epoch_training_loss_text = f'Model: {self.model_name}, Final Epoch Training Loss: {self.total_train_loss_epoch[-1]}'
         final_total_training_time_text = f'Model: {self.model_name}, Final Total Training Time: {self.total_training_time[-1]}'
         self.logger.experiment.add_text('Final Epoch Training Loss', final_epoch_training_loss_text, self.current_epoch)
@@ -268,9 +281,11 @@ class ModelLightningModule(pl.LightningModule):
         fig, ax = plt.subplots(figsize=(10, 6))
         
         for name, grads in gradients.items():
-            ax.hist(grads, bins=50, alpha=0.5, label=name)
-        
+            bins = np.linspace(-0.5, 0.5, 100)
+            ax.hist(grads, bins=bins, alpha=0.5, label=name)
+           
         ax.set_yscale('log')
+        ax.set_xlim([-0.5, 0.5])
         ax.set_xlabel('Gradient Magnitude')
         ax.set_ylabel('Count')
         ax.set_title(f'Gradient Histograms at Epoch {epoch}')
