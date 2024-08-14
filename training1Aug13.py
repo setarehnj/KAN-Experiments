@@ -114,6 +114,7 @@ import pytorch_lightning as pl
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
 
 class ModelLightningModule(pl.LightningModule):
     def __init__(self, model, loss_fn, lr, model_name, histogram_log_frequency=1000):
@@ -133,6 +134,10 @@ class ModelLightningModule(pl.LightningModule):
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.gradient_histograms = {}
         self.histogram_log_frequency = histogram_log_frequency
+        self.max_grad_components = {}
+        self.mean_abs_grads = {}  # to store mean absolute gradients for each loss
+
+
 
     def forward(self, x):
         return self.model(x)
@@ -148,7 +153,7 @@ class ModelLightningModule(pl.LightningModule):
         total_loss = sum(loss.mean() for loss in losses.values())
 
         all_gradients = {name: [] for name in losses.keys()}
-
+        
         # Compute gradients for each loss component
         for name, loss in losses.items():
             self.manual_backward(loss.mean(), retain_graph=True)
@@ -169,6 +174,21 @@ class ModelLightningModule(pl.LightningModule):
             
             # Clear gradients for the next loss component
             self.optimizer.zero_grad()
+
+        for name, grads in all_gradients.items():
+            max_grad = np.max(grads)
+            mean_abs_grad = np.mean(np.abs(grads))
+            if name not in self.max_grad_components:
+                self.max_grad_components[name] = []
+            self.max_grad_components[name].append(max_grad)
+            self.log(f'{name}_max_grad', max_grad, on_epoch=True, prog_bar=True, logger=True)
+            if name not in self.mean_abs_grads:
+                self.mean_abs_grads[name] = []
+            self.mean_abs_grads[name].append(mean_abs_grad)
+            self.log(f'{name}_mean_abs_grad', mean_abs_grad, on_epoch=True, prog_bar=True, logger=True)
+            self.log(f'{name}_max_grad', max_grad, on_epoch=True, prog_bar=True, logger=True)
+           
+
         
         self.optimizer.zero_grad()
         # Compute gradients for the total loss (this will be used for the actual update)
@@ -207,6 +227,24 @@ class ModelLightningModule(pl.LightningModule):
         if self.current_epoch in self.gradient_histograms:
             self.plot_gradient_histograms(self.current_epoch)
 
+
+    def save_gradient_stats_to_csv(self):
+   
+        
+        data = {
+        'epoch': range(len(self.total_train_loss_epoch)),
+        'total_loss': self.total_train_loss_epoch
+        }
+    
+        for name in self.single_losses_epoch.keys():
+            data[f'{name}_loss'] = self.single_losses_epoch[name]
+            data[f'{name}_max_grad'] = self.max_grad_components[name]
+            data[f'{name}_mean_abs_grad'] = self.mean_abs_grads[name]
+    
+        df = pd.DataFrame(data)
+        df.to_csv(f'{self.model_name}_gradient_stats.csv', index=False)
+
+
     def on_train_end(self):
         final_checkpoint = f"{self.model_name}_final.ckpt"
         torch.save(self.state_dict(), final_checkpoint)
@@ -218,6 +256,12 @@ class ModelLightningModule(pl.LightningModule):
             final_loss = values[-1]
             final_loss_text = f'Model: {self.model_name}, Final {name} Loss: {final_loss}'
             self.logger.experiment.add_text(f'Final {name} Loss', final_loss_text, self.current_epoch)
+        for name, max_grads in self.max_grad_components.items():
+            final_max_grad = max_grads[-1]
+            final_max_grad_text = f'Model: {self.model_name}, Final {name} Max Gradient: {final_max_grad}'
+            self.logger.experiment.add_text(f'Final {name} Max Gradient', final_max_grad_text, self.current_epoch)
+        self.save_gradient_stats_to_csv()    
+    
 
     def plot_gradient_histograms(self, epoch):
         gradients = self.gradient_histograms[epoch]
